@@ -1,2 +1,2 @@
 # safely
-Safely wraps goroutine creation syntax
+[![GoDoc](https://godoc.org/github.com/teepark/safely?status.svg)](https://godoc.org/github.com/teepark/safely)
