@@ -45,27 +45,30 @@ func getStack() string {
 	}
 }
 
+func recoverer(stackTraceTo io.Writer) func() {
+	if stackTraceTo == nil {
+		return func() {
+			recover()
+		}
+	}
+	return func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(
+				stackTraceTo,
+				"safely caught panic: %s\n%s",
+				r,
+				getStack(),
+			)
+		}
+	}
+}
+
 // Go runs its function argument in a separate goroutine, but recovers from any
 // panics, optionally writing stack traces to an io.Writer.
 func Go(f func(), stackTraceTo io.Writer) {
-	go func() {
-		if stackTraceTo != nil {
-			defer func() {
-				if r := recover(); r != nil {
-					fmt.Fprintf(
-						stackTraceTo,
-						"safely caught a panic: %s\n%s",
-						r,
-						getStack(),
-					)
-				}
-			}()
-		} else {
-			defer func() {
-				recover()
-			}()
-		}
-
+	r := recoverer(stackTraceTo)
+	go func(r func()) {
+		defer r()
 		f()
-	}()
+	}(r)
 }

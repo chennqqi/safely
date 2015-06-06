@@ -31,7 +31,7 @@ func TestPrintsStack(t *testing.T) {
 
 	lines := strings.Split(string(*r), "\n")
 
-	if lines[0] != "safely caught a panic: failer" {
+	if lines[0] != "safely caught panic: failer" {
 		t.Fatalf("wrong first line: '%s'", lines[0])
 	}
 	if !strings.HasPrefix(lines[1], "goroutine ") ||
