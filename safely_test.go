@@ -1,15 +1,16 @@
 package safely
 
 import (
+	"runtime"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestDoesntPanic(t *testing.T) {
+	DefaultSender.SetPanicHandler(nil)
 	Go(func() {
 		panic("omgOmgOMG")
-	}, nil)
+	})
 }
 
 type recorder []byte
@@ -25,9 +26,10 @@ func failer() {
 
 func TestPrintsStack(t *testing.T) {
 	r := &recorder{}
+	DefaultSender.SetStackWriter(r)
 
-	Go(failer, r)
-	time.Sleep(10 * time.Millisecond)
+	Go(failer)
+	runtime.Gosched()
 
 	lines := strings.Split(string(*r), "\n")
 
