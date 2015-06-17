@@ -7,10 +7,10 @@ import (
 )
 
 func TestDoesntPanic(t *testing.T) {
-	DefaultSender.SetPanicHandler(nil)
+	DefaultPanicHandler = nil
 	Go(func() {
 		panic("omgOmgOMG")
-	})
+	}, nil)
 }
 
 type recorder []byte
@@ -26,9 +26,9 @@ func failer() {
 
 func TestPrintsStack(t *testing.T) {
 	r := &recorder{}
-	DefaultSender.SetStackWriter(r)
+	DefaultPanicHandler = StackWriter(r)
 
-	Go(failer)
+	Go(failer, nil)
 	runtime.Gosched()
 
 	lines := strings.Split(string(*r), "\n")
@@ -43,5 +43,19 @@ func TestPrintsStack(t *testing.T) {
 
 	if !strings.HasPrefix(lines[2], "github.com/teepark/safely.failer") {
 		t.Fatalf("wrong third line: '%s'", lines[2])
+	}
+}
+
+func TestHandlerDoesntRunInAbsenseOfPanic(t *testing.T) {
+	ran := false
+	handler := func(obj interface{}) {
+		ran = true
+	}
+
+	Go(func() {}, handler)
+	runtime.Gosched()
+
+	if ran {
+		t.Fatal("panic handler ran even though main func never paniced?")
 	}
 }

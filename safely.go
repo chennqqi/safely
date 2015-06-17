@@ -19,7 +19,7 @@ But using safely to spawn goroutines adds protection for them:
 	func (handler *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		safely.Go(func() {
 			// do something in parallel, panics will be recovered.
-		})
+		}, nil)
 	}
 */
 package safely
@@ -32,72 +32,39 @@ import (
 	"strings"
 )
 
-// DefaultSender is used by the global Go function to spawn goroutines.
-var DefaultSender = &Sender{&stackWriter{os.Stderr}}
+// DefaultPanicHandler is used by Go when the second argument is nil.
+var DefaultPanicHandler = StackWriter(os.Stderr)
 
-// PanicHandler is an object that can deal appropriately
-// with a panic in a spawned goroutine.
-type PanicHandler interface {
-	Handle(interface{})
-}
+// PanicHandler is a func that can deal appropriately
+// with panics from spawned goroutine.
+type PanicHandler func(interface{})
 
-// Sender is a struct that can be used to customize the
-// safe spawning of goroutines.
-type Sender struct {
-	handler PanicHandler
-}
-
-// NewSender creates a new sender with a specific
-// panic handler (which can be nil).
-func NewSender(handler PanicHandler) *Sender {
-	return &Sender{handler}
-}
-
-// SetPanicHandler overwrites the Sender's panic handler.
-func (sender *Sender) SetPanicHandler(handler PanicHandler) {
-	sender.handler = handler
-}
-
-// SetStackWriter sets a panic handler that formats
-// and writes the stack trace to an io.Writer.
-func (sender *Sender) SetStackWriter(writer io.Writer) {
-	sender.SetPanicHandler(&stackWriter{writer})
-}
-
-// Go runs the provided function in a new goroutine
-// with recovery and panic handling.
-func (sender *Sender) Go(function func()) {
-	r := sender.recoverer()
-	go func(r func()) {
-		defer r()
-		function()
-	}(r)
-}
-
-// Go runs its function argument in a separate goroutine, but recovers from any
-// panics, optionally writing stack traces to an io.Writer.
-func Go(f func()) {
-	DefaultSender.Go(f)
-}
-
-func (sender *Sender) recoverer() func() {
-	if sender.handler == nil {
-		return func() {
-			recover()
-		}
+// Go runs its first argument in a separate goroutine, but recovers from any
+// panics with the provided PanicHandler (using DefaultPanicHandler if nil).
+func Go(f func(), h PanicHandler) {
+	if h == nil {
+		h = DefaultPanicHandler
 	}
-	return func() {
-		sender.handler.Handle(recover())
+
+	go func() {
+		defer func() {
+			r := recover()
+			if r != nil && h != nil {
+				h(r)
+			}
+		}()
+
+		f()
+	}()
+}
+
+// StackWriter creates a PanicHandler that dumps a stack trace to the provided
+// io.Writer in the event of a panic.
+func StackWriter(out io.Writer) PanicHandler {
+	return func(obj interface{}) {
+		stack := getStack()
+		fmt.Fprintf(out, "safely caught panic: %s\n%s", obj, stack)
 	}
-}
-
-type stackWriter struct {
-	io.Writer
-}
-
-func (sw *stackWriter) Handle(msg interface{}) {
-	stack := getStack()
-	fmt.Fprintf(sw, "safely caught panic: %s\n%s", msg, stack)
 }
 
 func getStack() string {
