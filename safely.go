@@ -68,13 +68,12 @@ func StackWriter(out io.Writer) PanicHandler {
 }
 
 func getStack() string {
-	l := 4096
+	l := 2048
 	for {
 		b := make([]byte, l)
 		n := runtime.Stack(b, false)
 		if n < l {
 			st := string(b[:n])
-			//return st
 			sp := strings.SplitAfter(st, "\n")
 			return sp[0] + strings.Join(sp[7:len(sp)-5], "")
 		}
