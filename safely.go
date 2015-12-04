@@ -28,8 +28,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
-	"strings"
+
+	"gopkg.in/stack.v1"
 )
 
 // DefaultPanicHandler is used by Go when the second argument is nil.
@@ -37,7 +37,7 @@ var DefaultPanicHandler = StackWriter(os.Stderr)
 
 // PanicHandler is a func that can deal appropriately
 // with panics from spawned goroutine.
-type PanicHandler func(interface{})
+type PanicHandler func(interface{}, stack.CallStack)
 
 // Go runs its first argument in a separate goroutine, but recovers from any
 // panics with the provided PanicHandler (using DefaultPanicHandler if nil).
@@ -50,7 +50,7 @@ func Go(f func(), h PanicHandler) {
 		defer func() {
 			r := recover()
 			if r != nil && h != nil {
-				h(r)
+				h(r, stack.Trace().TrimRuntime()[2:])
 			}
 		}()
 
@@ -61,22 +61,7 @@ func Go(f func(), h PanicHandler) {
 // StackWriter creates a PanicHandler that dumps a stack trace to the provided
 // io.Writer in the event of a panic.
 func StackWriter(out io.Writer) PanicHandler {
-	return func(obj interface{}) {
-		stack := getStack()
-		fmt.Fprintf(out, "safely caught panic: %s\n%s", obj, stack)
-	}
-}
-
-func getStack() string {
-	l := 2048
-	for {
-		b := make([]byte, l)
-		n := runtime.Stack(b, false)
-		if n < l {
-			st := string(b[:n])
-			sp := strings.SplitAfter(st, "\n")
-			return sp[0] + strings.Join(sp[7:len(sp)-5], "")
-		}
-		l *= 2
+	return func(obj interface{}, callstack stack.CallStack) {
+		fmt.Fprintf(out, "safely caught panic: %s\n%+v", obj, callstack)
 	}
 }

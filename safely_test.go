@@ -1,9 +1,11 @@
 package safely
 
 import (
-	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"gopkg.in/stack.v1"
 )
 
 func TestDoesntPanic(t *testing.T) {
@@ -29,31 +31,23 @@ func TestPrintsStack(t *testing.T) {
 	DefaultPanicHandler = StackWriter(r)
 
 	Go(failer, nil)
-	runtime.Gosched()
+	time.Sleep(time.Millisecond)
 
 	lines := strings.Split(string(*r), "\n")
 
 	if lines[0] != "safely caught panic: failer" {
 		t.Fatalf("wrong first line: '%s'", lines[0])
 	}
-	if !strings.HasPrefix(lines[1], "goroutine ") ||
-		!strings.HasSuffix(lines[1], "[running]:") {
-		t.Fatalf("wrong second line: '%s'", lines[1])
-	}
-
-	if !strings.HasPrefix(lines[2], "github.com/teepark/safely.failer") {
-		t.Fatalf("wrong third line: '%s'", lines[2])
-	}
 }
 
 func TestHandlerDoesntRunInAbsenseOfPanic(t *testing.T) {
 	ran := false
-	handler := func(obj interface{}) {
+	handler := func(obj interface{}, _ stack.CallStack) {
 		ran = true
 	}
 
 	Go(func() {}, handler)
-	runtime.Gosched()
+	time.Sleep(time.Millisecond)
 
 	if ran {
 		t.Fatal("panic handler ran even though main func never paniced?")
